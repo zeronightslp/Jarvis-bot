@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd dashboard && npm run build",
+  "buildCommand": "npm run build --prefix dashboard",
   "outputDirectory": "dashboard/.next",
-  "installCommand": "cd dashboard && npm install",
+  "installCommand": "npm install --prefix dashboard && npm install next --no-save",
   "framework": "nextjs"
 }

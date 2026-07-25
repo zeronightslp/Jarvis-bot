@@ -1,10 +1,19 @@
 {
   "name": "jarvis-ai-system",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "cd dashboard && npm run dev",
     "build": "cd dashboard && npm run build",
     "start": "cd dashboard && npm run start"
+  },
+  "dependencies": {
+    "next": "16.2.12",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "lucide-react": "^1.27.0"
+  },
+  "devDependencies": {
+    "typescript": "^5"
   }
 }

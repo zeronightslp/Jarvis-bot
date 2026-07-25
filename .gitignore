@@ -1,0 +1,7 @@
+node_modules
+.next
+*.mp3
+.env
+voice_temp.mp3
+__pycache__/
+*.pyc
