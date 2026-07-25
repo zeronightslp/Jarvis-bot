@@ -1,0 +1,4 @@
+pyaudio
+SpeechRecognition
+lmnt
+python-dotenv
