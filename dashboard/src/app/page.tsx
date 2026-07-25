@@ -6,9 +6,10 @@ export default function JarvisDashboard() {
   const [currentTime, setCurrentTime] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [lastHeard, setLastHeard] = useState("");
+  const [textInput, setTextInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("Microfone em espera (Modo Contínuo)");
   const [logs, setLogs] = useState<Array<{ time: string; type: string; message: string }>>([
-    { time: new Date().toLocaleTimeString(), type: "SYSTEM", message: "JARVIS Web Core v3.7 - Escuta Direta Contínua." },
+    { time: new Date().toLocaleTimeString(), type: "SYSTEM", message: "JARVIS Web Core v3.8 - Escuta por Voz e Digitação Ativas." },
   ]);
 
   const recognitionRef = useRef<any>(null);
@@ -28,7 +29,6 @@ export default function JarvisDashboard() {
     setLogs((prev) => [{ time, type, message }, ...prev.slice(0, 15)]);
   };
 
-  // Fala apenas 1 vez, sem interromper ou desativar o microfone
   const speakWebOnce = (text: string) => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -39,10 +39,12 @@ export default function JarvisDashboard() {
     }
   };
 
-  const handleBrowserCommand = (text: string) => {
-    const command = text.toLowerCase().strip ? text.toLowerCase().strip() : text.toLowerCase().trim();
+  const handleCommandExecution = (text: string, source: "VOICE" | "TEXT" = "VOICE") => {
+    const command = text.toLowerCase().trim();
+    if (!command) return;
+
     setLastHeard(command);
-    addLog("VOICE_IN", `Ouvido: "${command}"`);
+    addLog(source === "VOICE" ? "VOICE_IN" : "TEXT_IN", `Comando (${source}): "${command}"`);
 
     // 1. WHATSAPP
     if (command.includes("whatsapp") || command.includes("zap")) {
@@ -88,9 +90,19 @@ export default function JarvisDashboard() {
     }
     // 8. PALAVRA DE ATIVAÇÃO SIMPLES
     else if (command.includes("jarvis") || command.includes("chaves")) {
-      addLog("JARVIS", "Jarvis ouvindo...");
-      // Não fala redundância extra
+      addLog("JARVIS", "Jarvis pronto.");
+    } else {
+      addLog("SYSTEM", `Executando busca por '${command}'...`);
+      speakWebOnce(`Buscando ${command}.`);
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(command)}`, "_blank");
     }
+  };
+
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!textInput.trim()) return;
+    handleCommandExecution(textInput, "TEXT");
+    setTextInput("");
   };
 
   const toggleMicrophone = () => {
@@ -129,7 +141,7 @@ export default function JarvisDashboard() {
       recognition.onresult = (event: any) => {
         const lastIndex = event.results.length - 1;
         const transcript = event.results[lastIndex][0].transcript;
-        handleBrowserCommand(transcript);
+        handleCommandExecution(transcript, "VOICE");
       };
 
       recognition.onerror = (event: any) => {
@@ -168,7 +180,7 @@ export default function JarvisDashboard() {
         <div className="flex items-center gap-3">
           <div className={`w-4 h-4 rounded-full ${isListening ? "bg-emerald-400 animate-ping" : "bg-cyan-600"}`} />
           <h1 className="text-xl font-bold tracking-widest text-cyan-200 uppercase flex items-center gap-2">
-            J.A.R.V.I.S. <span className="text-xs px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400">WEB HUD v3.7</span>
+            J.A.R.V.I.S. <span className="text-xs px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400">WEB HUD v3.8</span>
           </h1>
         </div>
 
@@ -188,7 +200,7 @@ export default function JarvisDashboard() {
         {/* Arc Reactor Core & Mic Controller */}
         <section className="bg-[#060c1d]/70 border border-cyan-900/50 rounded-xl p-6 flex flex-col items-center justify-between shadow-[0_0_40px_rgba(0,242,255,0.05)] backdrop-blur-md">
           <h2 className="text-sm font-semibold tracking-wider text-cyan-400 uppercase w-full border-b border-cyan-900/50 pb-2 text-center">
-            Reator Arc & Captura Sem Interrupção
+            Reator Arc & Captura de Voz
           </h2>
 
           <div className="relative my-8 flex items-center justify-center cursor-pointer" onClick={toggleMicrophone}>
@@ -223,51 +235,52 @@ export default function JarvisDashboard() {
           
           <div className="bg-[#060c1d]/70 border border-cyan-900/50 rounded-xl p-6 backdrop-blur-md">
             <h2 className="text-sm font-semibold tracking-wider text-cyan-400 uppercase border-b border-cyan-900/50 pb-2 mb-4">
-              Comandos em Modo Contínuo (Fala Única)
+              Comandos por Voz e Texto Suportados
             </h2>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div className="bg-[#09132a] p-2.5 rounded border border-cyan-900/50">
-                <span className="text-cyan-200 font-bold block">"Jarvis abre o WhatsApp"</span>
+                <span className="text-cyan-200 font-bold block">"abra o whatsapp"</span>
                 <span className="text-[10px] text-cyan-500">Abre WhatsApp Web</span>
               </div>
               <div className="bg-[#09132a] p-2.5 rounded border border-cyan-900/50">
-                <span className="text-cyan-200 font-bold block">"Jarvis abre o Obsidian"</span>
+                <span className="text-cyan-200 font-bold block">"abra o obsidian"</span>
                 <span className="text-[10px] text-cyan-500">Abre Obsidian</span>
               </div>
               <div className="bg-[#09132a] p-2.5 rounded border border-cyan-900/50">
-                <span className="text-cyan-200 font-bold block">"Jarvis toca AC/DC"</span>
+                <span className="text-cyan-200 font-bold block">"toca acdc"</span>
                 <span className="text-[10px] text-cyan-500">Toca no YouTube</span>
               </div>
               <div className="bg-[#09132a] p-2.5 rounded border border-cyan-900/50">
-                <span className="text-cyan-200 font-bold block">"Jarvis abre o ChatGPT"</span>
+                <span className="text-cyan-200 font-bold block">"chatgpt"</span>
                 <span className="text-[10px] text-cyan-500">Abre ChatGPT</span>
               </div>
               <div className="bg-[#09132a] p-2.5 rounded border border-cyan-900/50">
-                <span className="text-cyan-200 font-bold block">"Jarvis abre o GitHub"</span>
+                <span className="text-cyan-200 font-bold block">"github"</span>
                 <span className="text-[10px] text-cyan-500">Abre GitHub</span>
               </div>
               <div className="bg-[#09132a] p-2.5 rounded border border-cyan-900/50">
-                <span className="text-cyan-200 font-bold block">"Jarvis"</span>
-                <span className="text-[10px] text-cyan-500">Escuta silenciosa</span>
+                <span className="text-cyan-200 font-bold block">Qualquer outro texto</span>
+                <span className="text-[10px] text-cyan-500">Busca no Google</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-[#060c1d]/70 border border-cyan-900/50 rounded-xl p-6 flex-1 backdrop-blur-md flex flex-col">
-            <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2 mb-3">
+          <div className="bg-[#060c1d]/70 border border-cyan-900/50 rounded-xl p-6 flex-1 backdrop-blur-md flex flex-col justify-between gap-4">
+            <div className="flex justify-between items-center border-b border-cyan-900/50 pb-2">
               <h2 className="text-sm font-semibold tracking-wider text-cyan-400 uppercase flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                Console de Reconhecimento
+                Terminal & Entrada Manual de Comandos
               </h2>
               {lastHeard && (
                 <span className="text-xs text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-                  Última fala: "{lastHeard}"
+                  Último: "{lastHeard}"
                 </span>
               )}
             </div>
 
-            <div className="bg-[#02040a] border border-cyan-950 p-4 rounded-lg flex-1 font-mono text-xs space-y-2 overflow-y-auto max-h-60">
+            {/* Terminal Logs */}
+            <div className="bg-[#02040a] border border-cyan-950 p-4 rounded-lg flex-1 font-mono text-xs space-y-2 overflow-y-auto max-h-48">
               {logs.map((log, i) => (
                 <div key={i} className="flex gap-3">
                   <span className="text-cyan-700">[{log.time}]</span>
@@ -276,6 +289,23 @@ export default function JarvisDashboard() {
                 </div>
               ))}
             </div>
+
+            {/* Input Bar Form */}
+            <form onSubmit={handleTextSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="> Digite um comando para o Jarvis (ex: 'abra o obsidian', 'whatsapp', 'toca acdc')..."
+                className="flex-1 bg-[#02040a] border border-cyan-800/80 rounded-lg px-4 py-2.5 text-xs text-cyan-100 placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+              />
+              <button
+                type="submit"
+                className="bg-cyan-950 hover:bg-cyan-900 border border-cyan-600 text-cyan-100 text-xs px-5 py-2.5 rounded-lg font-bold tracking-wider transition-all uppercase shadow-[0_0_15px_rgba(0,242,255,0.15)]"
+              >
+                ENVIAR
+              </button>
+            </form>
           </div>
 
         </section>
