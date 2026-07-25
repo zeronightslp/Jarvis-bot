@@ -46,10 +46,10 @@ def speak(text):
     except Exception as e:
         print(f"Erro ao executar fala: {e}")
 
-# --- HELPER DE ABERTURA SEGURA DE URLS (EVITA DUPICAR ABAS) ---
+# --- HELPER DE ABERTURA SEGURA DE URLS ---
 def open_url_safely(url, description=""):
     if url in opened_urls:
-        print(f"⚠️ {description or 'Página'} já está aberta. Evitando abrir aba duplicada.")
+        print(f"⚠️ {description or 'Página'} já está aberta.")
         return False
     opened_urls.add(url)
     webbrowser.open(url)
@@ -58,9 +58,8 @@ def open_url_safely(url, description=""):
 # --- HELPER PARA ABRIR OBSIDIAN NO LINUX ---
 def open_obsidian():
     print("Executando: Abrir Obsidian")
-    speak("Abrindo Obsidian, senhor.")
+    speak("Abrindo Obsidian.")
     try:
-        # Tenta via Flatpak (Método nativo instalado na sua máquina)
         subprocess.Popen(["flatpak", "run", "md.obsidian.Obsidian"])
     except Exception:
         try:
@@ -68,9 +67,9 @@ def open_obsidian():
         except Exception:
             webbrowser.open("obsidian://open")
 
-# --- TRIGGER DE DUAS PALMAS (ESTRITO E SEM ACDC) ---
-STRICT_CLAP_THRESHOLD = 0.40      # Threshold RMS bem elevado
-MAX_CLAP_PULSE_DURATION = 0.06    # Max 60ms por impulso
+# --- TRIGGER DE DUAS PALMAS ---
+STRICT_CLAP_THRESHOLD = 0.40
+MAX_CLAP_PULSE_DURATION = 0.06
 MIN_TIME_BETWEEN_CLAPS = 0.25
 MAX_TIME_BETWEEN_CLAPS = 0.70
 
@@ -81,7 +80,7 @@ RATE = 44100
 
 def on_two_claps():
     print("\n[+] 2 Palmas confirmadas! Abrindo Obsidian...")
-    speak("Duas palmas detectadas. Abrindo Obsidian.")
+    speak("Abrindo Obsidian.")
     open_obsidian()
 
 def get_rms(block):
@@ -100,7 +99,6 @@ def listen_for_claps():
         print(f"❌ Módulo de palmas desativado: {e}")
         return
 
-    print("🤖 Jarvis [Módulo Palmas] em calibragem...")
     time.sleep(2.5)
     print("🤖 Jarvis [Módulo Palmas] ONLINE.")
 
@@ -111,7 +109,6 @@ def listen_for_claps():
 
     while True:
         try:
-            # Se o usuário estiver falando com a voz, ignora palmas para evitar disparo por plosivas da voz
             if is_voice_processing:
                 time.sleep(0.1)
                 continue
@@ -139,7 +136,6 @@ def listen_for_claps():
                                 claps = 1
                             
                             last_clap_time = now
-                            print(f"👏 Palma detectada! ({claps}/2) - Dur: {pulse_duration*1000:.0f}ms | RMS: {rms:.2f}")
 
                             if claps == 2:
                                 on_two_claps()
@@ -148,14 +144,14 @@ def listen_for_claps():
         except Exception:
             time.sleep(0.05)
 
-# --- PROCESSAMENTO DE COMANDOS DE VOZ E NAVEGAÇÃO ---
+# --- PROCESSAMENTO DE COMANDOS DE VOZ ---
 def process_voice_command(command):
     global is_voice_processing
     is_voice_processing = True
 
     try:
         command = command.lower().strip()
-        print(f"⚙️ Processando comando do usuário: '{command}'")
+        print(f"⚙️ Comando detectado: '{command}'")
 
         # 1. OBSIDIAN
         if "obsidian" in command:
@@ -163,8 +159,7 @@ def process_voice_command(command):
 
         # 2. WHATSAPP
         elif "whatsapp" in command or "zap" in command:
-            print("Executando: Abrir WhatsApp Web")
-            speak("Abrindo o WhatsApp Web, senhor.")
+            speak("Abrindo WhatsApp.")
             open_url_safely("https://web.whatsapp.com", "WhatsApp Web")
 
         # 3. YOUTUBE / AC/DC / MÚSICA
@@ -177,13 +172,12 @@ def process_voice_command(command):
             if "acdc" in query or "ac/dc" in query:
                 acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
                 if acdc_url in opened_urls:
-                    speak("O clipe do AC/DC já está aberto no seu navegador, mestre.")
+                    print("AC/DC já aberto.")
                 else:
-                    speak("Tocando AC/DC no YouTube.")
+                    speak("Tocando AC/DC.")
                     open_url_safely(acdc_url, "AC/DC YouTube")
             elif len(query) > 2:
-                print(f"Executando: Buscar '{query}' no YouTube...")
-                speak(f"Buscando {query} no YouTube.")
+                speak(f"Buscando {query}.")
                 try:
                     url_search = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
                     req = urllib.request.Request(url_search, headers={"User-Agent": "Mozilla/5.0"})
@@ -194,10 +188,8 @@ def process_voice_command(command):
                         open_url_safely(first_video, f"Vídeo {query}")
                     else:
                         open_url_safely(url_search, f"Busca {query}")
-                except Exception as e:
+                except Exception:
                     open_url_safely(f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}", "Busca YouTube")
-            else:
-                print("Nenhum termo de busca reconhecido. Nenhuma ação tomada.")
 
         # 4. OUTROS SITES
         elif "youtube" in command:
@@ -218,66 +210,59 @@ def process_voice_command(command):
 
         # 5. CONTROLE DE MÍDIA EXPLÍCITO
         elif any(w in command for w in ["pausar música", "para a música", "pausar o vídeo", "parar música"]):
-            print("Executando: Pausar Mídia")
             subprocess.run(["playerctl", "pause"], check=False)
 
         elif any(w in command for w in ["próxima música", "pular música", "avança a música"]):
-            print("Executando: Avançar Música")
             subprocess.run(["playerctl", "next"], check=False)
 
     finally:
-        time.sleep(1.0)
+        time.sleep(0.5)
         is_voice_processing = False
 
 def listen_for_voice():
     recognizer = sr.Recognizer()
     recognizer.dynamic_energy_threshold = True
-    recognizer.pause_threshold = 1.2
+    recognizer.pause_threshold = 1.0
     is_awake = False
     wake_words = ["jarvis", "chaves", "charles", "davis"]
 
-    print("🤖 Jarvis [Módulo Voz] ONLINE. Aguardando palavra-chave ('Jarvis')...")
+    print("🤖 Jarvis [Módulo Voz] ONLINE - Modo Contínuo.")
 
     while True:
         try:
             with sr.Microphone() as source:
-                recognizer.adjust_for_ambient_noise(source, duration=0.8)
-                audio = recognizer.listen(source, timeout=None, phrase_time_limit=6)
+                recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                audio = recognizer.listen(source, timeout=None, phrase_time_limit=5)
 
             text = recognizer.recognize_google(audio, language="pt-BR").lower()
             print(f"🎙️ Ouvido: '{text}'")
 
-            # 1. Se já está acordado aguardando comando
             if is_awake:
                 process_voice_command(text)
                 is_awake = False
                 continue
 
-            # 2. Verifica obrigatoriamente se o áudio contém a Wake Word
             if any(w in text for w in wake_words):
                 cmd = text
                 for w in wake_words:
                     cmd = cmd.replace(w, " ")
                 cmd = cmd.strip()
 
-                if len(cmd) > 3:
-                    # Ex: "Jarvis abra o obsidian" ou "Jarvis toca AC/DC"
+                if len(cmd) > 2:
                     process_voice_command(cmd)
                 else:
-                    # Falou apenas "Jarvis"
                     is_awake = True
-                    speak("Estou ouvindo, mestre.")
 
         except sr.UnknownValueError:
             pass
         except sr.RequestError:
-            time.sleep(3)
+            time.sleep(2)
         except Exception:
-            time.sleep(1)
+            time.sleep(0.5)
 
 if __name__ == "__main__":
     print("==========================================")
-    print("      J.A.R.V.I.S. SYSTEM INITIALIZING     ")
+    print("      J.A.R.V.I.S. CONTINUOUS AGENT       ")
     print("==========================================")
     
     threading.Thread(target=listen_for_voice, daemon=True).start()
