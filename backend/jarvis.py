@@ -11,10 +11,18 @@ import os
 import urllib.parse
 import urllib.request
 import re
+import psutil
 from lmnt import AsyncLmnt
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# --- HELPER PARA CHECAR PROCESSOS ---
+def is_process_running(process_name):
+    for proc in psutil.process_iter(['name']):
+        if process_name.lower() in proc.info['name'].lower():
+            return True
+    return False
 
 # --- ESTADO GLOBAL DO SISTEMA ---
 opened_urls = set()
@@ -52,8 +60,29 @@ def open_url_safely(url, description=""):
         print(f"⚠️ {description or 'Página'} já está aberta.")
         return False
     opened_urls.add(url)
-    webbrowser.open(url)
+    try:
+        if is_process_running("chrome"):
+            subprocess.Popen(["google-chrome", "--new-window", url])
+        else:
+            subprocess.Popen(["google-chrome", url])
+    except:
+        webbrowser.open(url)
     return True
+
+# --- HELPER PARA FECHAR PAGINAS ABERTAS ---
+def close_all_pages():
+    global opened_urls
+    if not opened_urls:
+        return "Nenhuma página para fechar."
+    opened_urls.clear()
+    subprocess.run(["pkill", "chrome"], check=False)
+    return "Todas as páginas foram fechadas."
+
+# --- HELPER PARA LISTAR PÁGINAS ABERTAS ---
+def get_opened_urls():
+    if not opened_urls:
+        return "Nenhuma página foi registrada como aberta nesta sessão."
+    return "As páginas abertas são: " + ", ".join([url.split('//')[-1].split('/')[0] for url in opened_urls])
 
 # --- HELPER PARA ABRIR OBSIDIAN NO LINUX ---
 def open_obsidian():
@@ -161,6 +190,18 @@ def process_voice_command(command):
         elif "whatsapp" in command or "zap" in command:
             speak("Abrindo WhatsApp.")
             open_url_safely("https://web.whatsapp.com", "WhatsApp Web")
+
+        # 2.5 CALENDAR
+        elif "calendário" in command or "agenda" in command:
+            speak("Abrindo agenda.")
+            open_url_safely("https://calendar.google.com", "Google Calendar")
+
+        # 2.6 STATUS DAS PAGINAS
+        elif "fechar tudo" in command:
+            speak(close_all_pages())
+
+        elif "qual página" in command or "página atual" in command:
+            speak(get_opened_urls())
 
         # 3. YOUTUBE / AC/DC / MÚSICA
         elif any(w in command for w in ["toca", "tocar", "play", "coloque", "coloca", "ouvir"]):
