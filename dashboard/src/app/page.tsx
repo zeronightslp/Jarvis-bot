@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-
+import Head from "next/head";
 export default function JarvisDashboard() {
   const [currentTime, setCurrentTime] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -39,12 +39,28 @@ export default function JarvisDashboard() {
     }
   };
 
-  const handleCommandExecution = (text: string, source: "VOICE" | "TEXT" = "VOICE") => {
-    const command = text.toLowerCase().trim();
-    if (!command) return;
+  const handleCommandExecution = async (text: string, source: "VOICE" | "TEXT" = "VOICE") => {
+  const command = text.toLowerCase().trim();
+  if (!command) return;
 
-    setLastHeard(command);
-    addLog(source === "VOICE" ? "VOICE_IN" : "TEXT_IN", `Comando (${source}): "${command}"`);
+  setLastHeard(command);
+  addLog(source === "VOICE" ? "VOICE_IN" : "TEXT_IN", `Comando (${source}): "${command}"`);
+
+  // Remote backend call via ngrok tunnel if configured
+  const tunnelUrl = process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL;
+  if (tunnelUrl) {
+    try {
+      await fetch(`${tunnelUrl}/command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command })
+      });
+      addLog("REMOTE", "Comando enviado ao backend local");
+    } catch (e) {
+      addLog("ERROR", "Falha ao enviar comando ao backend");
+    }
+  }
+
 
     // 1. WHATSAPP
     if (command.includes("whatsapp") || command.includes("zap")) {
@@ -170,8 +186,19 @@ export default function JarvisDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#03060d] text-cyan-400 font-mono flex flex-col justify-between selection:bg-cyan-500 selection:text-black relative overflow-hidden">
-      <div className="fixed inset-0 bg-[radial-gradient(#00f2ff_1px,transparent_1px)] [background-size:32px_32px] opacity-10 pointer-events-none" />
+    <>
+      <Head>
+        <title>Jarvis – Assistente de Voz e HUD Web</title>
+        <meta name="description" content="Jarvis AI é um assistente pessoal de voz que controla seu computador e serviços web (Obsidian, WhatsApp, YouTube, Google Agenda) via comandos de voz ou texto." />
+        <meta property="og:title" content="Jarvis – Assistente de Voz e HUD Web" />
+        <meta property="og:description" content="Controle seu desktop e apps web com simples palavras. Experimente agora!" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL || ""} />
+        <meta property="og:image" content="/social-preview.png" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+      <div className="min-h-screen bg-[#03060d] text-cyan-400 font-mono flex flex-col justify-between selection:bg-cyan-500 selection:text-black relative overflow-hidden">
+        <div className="fixed inset-0 bg-[radial-gradient(#00f2ff_1px,transparent_1px)] [background-size:32px_32px] opacity-10 pointer-events-none" />
       <div className="fixed -top-40 -left-40 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="fixed -bottom-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 

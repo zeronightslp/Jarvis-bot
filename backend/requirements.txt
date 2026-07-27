@@ -2,3 +2,7 @@ pyaudio
 SpeechRecognition
 lmnt
 python-dotenv
+fastapi
+uvicorn[standard]
+requests
+psutil
