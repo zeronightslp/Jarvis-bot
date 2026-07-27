@@ -342,6 +342,7 @@ export default function JarvisDashboard() {
         <div>DEPLOY: VERCEL WEB HUD</div>
         <div>JARVIS AI SYSTEM &copy; STARK ARCHITECTURE</div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 }
