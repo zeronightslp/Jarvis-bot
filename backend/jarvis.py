@@ -92,7 +92,7 @@ def smart_media_player(query, platform="YouTube", media_type="música", mode="pl
             speak("Abrindo YouTube.")
             return open_url_safely("https://www.youtube.com", "YouTube Home")
 
-        speak(f"Buscando {query} no YouTube e filtrando anúncios.")
+        speak(f"Buscando {query} no YouTube e selecionando vídeo orgânico.")
         try:
             url_search = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
             req = urllib.request.Request(
@@ -101,19 +101,38 @@ def smart_media_player(query, platform="YouTube", media_type="música", mode="pl
             )
             html = urllib.request.urlopen(req).read().decode('utf-8', errors='ignore')
 
-            # Filter out promoted ad blocks and ad badges from HTML before extracting video ID
-            clean_html = re.sub(r'<ytd-promoted-[^>]+>.*?</ytd-promoted-[^>]+>', '', html, flags=re.DOTALL)
-            clean_html = re.sub(r'("badgeStyleType"\s*:\s*"BADGE_STYLE_TYPE_AD")[^}]+', '', clean_html)
+            organic_video_ids = []
 
-            video_ids = re.findall(r"watch\?v=([a-zA-Z0-9_-]{11})", clean_html)
+            # Method 1: Extract from ytInitialData JSON payload
+            yt_data_match = re.search(r'var\s+ytInitialData\s*=\s*({.*?});</script>', html)
+            if yt_data_match:
+                try:
+                    data = json.loads(yt_data_match.group(1))
+                    sections = data.get("contents", {}).get("twoColumnSearchResultsRenderer", {}).get("primaryContents", {}).get("sectionListRenderer", {}).get("contents", [])
+                    for section in sections:
+                        items = section.get("itemSectionRenderer", {}).get("contents", [])
+                        for item in items:
+                            # Only target videoRenderer (ignores channelRenderer, playlistRenderer, radioRenderer/mixes, shorts, ads)
+                            if "videoRenderer" in item:
+                                vr = item["videoRenderer"]
+                                badges = vr.get("badges", [])
+                                is_ad = any("AD" in str(b).upper() or "SPONSORED" in str(b).upper() for b in badges)
+                                if not is_ad and "videoId" in vr:
+                                    organic_video_ids.append(vr["videoId"])
+                except Exception as parse_err:
+                    print(f"⚠️ Aviso no parse de ytInitialData: {parse_err}")
 
-            # Preserve order while eliminating duplicate IDs
-            seen = set()
-            organic_video_ids = [v for v in video_ids if not (v in seen or seen.add(v))]
+            # Method 2: Fallback regex if ytInitialData parsing produced no video IDs
+            if not organic_video_ids:
+                clean_html = re.sub(r'<ytd-promoted-[^>]+>.*?</ytd-promoted-[^>]+>', '', html, flags=re.DOTALL)
+                clean_html = re.sub(r'("badgeStyleType"\s*:\s*"BADGE_STYLE_TYPE_AD")[^}]+', '', clean_html)
+                raw_ids = re.findall(r"watch\?v=([a-zA-Z0-9_-]{11})", clean_html)
+                seen = set()
+                organic_video_ids = [v for v in raw_ids if not (v in seen or seen.add(v))]
 
             if organic_video_ids:
                 first_organic = f"https://www.youtube.com/watch?v={organic_video_ids[0]}"
-                speak(f"Reproduzindo primeiro resultado orgânico para {query}.")
+                speak(f"Reproduzindo primeiro vídeo orgânico para {query}.")
                 return open_url_safely(first_organic, f"Vídeo Orgânico: {query}")
             else:
                 return open_url_safely(url_search, f"Busca Orgânica YouTube: {query}")
