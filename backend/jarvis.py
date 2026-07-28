@@ -182,46 +182,41 @@ def process_voice_command(command):
         command = command.lower().strip()
         print(f"⚙️ Comando detectado: '{command}'")
 
-        # 1. OBSIDIAN
-        if "obsidian" in command:
-            open_obsidian()
+        # Clean wake words at the beginning
+        raw = re.sub(r'^(chaves|jarvis|charles|davis|ei jarvis|ouvi jarvis)\s*', '', command, flags=re.IGNORECASE).strip()
 
-        # 2. WHATSAPP
-        elif "whatsapp" in command or "zap" in command:
-            speak("Abrindo WhatsApp.")
-            open_url_safely("https://web.whatsapp.com", "WhatsApp Web")
+        # Phonetic normalization for AC/DC variants ("a cdc", "ac dc", "coloca cd", etc.)
+        is_acdc = bool(re.search(r'\b(acdc|ac\/dc|a cdc|ac dc|a c d c|toca cd|coloca cd)\b', raw, flags=re.IGNORECASE))
 
-        # 2.5 CALENDAR
-        elif "calendário" in command or "agenda" in command:
-            speak("Abrindo agenda.")
-            open_url_safely("https://calendar.google.com", "Google Calendar")
+        # Check for media/play intent
+        has_play_action = any(w in raw for w in ["toca", "tocar", "play", "coloca", "coloque", "ouvir", "pesquisa", "procura", "abertura", "música", "musica", "vídeo", "video"])
+        is_yt_intent = has_play_action or ("youtube" in raw and len(re.sub(r'^(abra|abrir|open)?\s*o?\s*youtube\s*', '', raw, flags=re.IGNORECASE).strip()) > 0)
 
-        # 2.6 STATUS DAS PAGINAS
-        elif "fechar tudo" in command:
-            speak(close_all_pages())
+        if is_acdc:
+            acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
+            if acdc_url in opened_urls:
+                print("AC/DC já aberto.")
+            else:
+                speak("Tocando AC/DC.")
+                open_url_safely(acdc_url, "AC/DC YouTube")
 
-        elif "qual página" in command or "página atual" in command:
-            speak(get_opened_urls())
+        elif is_yt_intent:
+            query = raw
+            fillers = [
+                "abre o youtube e coloca", "coloca no youtube", "pesquisa no youtube", "procura no youtube",
+                "abre o youtube", "abrir youtube", "no youtube", "youtube", "toca para mim", "coloca para mim",
+                "tocar", "toca", "coloca", "coloque", "pesquisa", "procura", "música", "musica", "vídeo", "video",
+                "para mim", "por favor"
+            ]
+            for f in fillers:
+                query = query.replace(f, " ")
+            query = re.sub(r'\s+', ' ', query).strip()
 
-        # 3. YOUTUBE / AC/DC / MÚSICA
-        elif any(w in command for w in ["toca", "tocar", "play", "coloque", "coloca", "ouvir"]):
-            query = command
-            for word in ["coloque", "coloca", "tocar", "toca", "música", " de ", " o ", " a ", "um ", "uma ", "no youtube", "ouvir"]:
-                query = query.replace(word, " ")
-            query = query.strip()
-
-            if "acdc" in query or "ac/dc" in query:
-                acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
-                if acdc_url in opened_urls:
-                    print("AC/DC já aberto.")
-                else:
-                    speak("Tocando AC/DC.")
-                    open_url_safely(acdc_url, "AC/DC YouTube")
-            elif len(query) > 2:
-                speak(f"Buscando {query}.")
+            if len(query) > 0:
+                speak(f"Buscando {query} no YouTube.")
                 try:
                     url_search = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
-                    req = urllib.request.Request(url_search, headers={"User-Agent": "Mozilla/5.0"})
+                    req = urllib.request.Request(url_search, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64)"})
                     html = urllib.request.urlopen(req).read().decode()
                     video_ids = re.findall(r"watch\?v=([a-zA-Z0-9_-]{11})", html)
                     if video_ids:
@@ -231,21 +226,45 @@ def process_voice_command(command):
                         open_url_safely(url_search, f"Busca {query}")
                 except Exception:
                     open_url_safely(f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}", "Busca YouTube")
+            else:
+                speak("Abrindo YouTube.")
+                open_url_safely("https://www.youtube.com", "YouTube")
+
+        # 1. OBSIDIAN
+        elif "obsidian" in raw:
+            open_obsidian()
+
+        # 2. WHATSAPP
+        elif "whatsapp" in raw or "zap" in raw:
+            speak("Abrindo WhatsApp.")
+            open_url_safely("https://web.whatsapp.com", "WhatsApp Web")
+
+        # 2.5 CALENDAR
+        elif "calendário" in raw or "agenda" in raw:
+            speak("Abrindo agenda.")
+            open_url_safely("https://calendar.google.com", "Google Calendar")
+
+        # 2.6 STATUS DAS PAGINAS
+        elif "fechar tudo" in raw:
+            speak(close_all_pages())
+
+        elif "qual página" in raw or "página atual" in raw:
+            speak(get_opened_urls())
 
         # 4. OUTROS SITES
-        elif "youtube" in command:
+        elif "youtube" in raw:
             speak("Abrindo YouTube.")
             open_url_safely("https://www.youtube.com", "YouTube")
 
-        elif "chatgpt" in command or "chat gpt" in command:
+        elif "chatgpt" in raw or "chat gpt" in raw:
             speak("Abrindo ChatGPT.")
             open_url_safely("https://chatgpt.com", "ChatGPT")
 
-        elif "github" in command:
+        elif "github" in raw:
             speak("Abrindo GitHub.")
             open_url_safely("https://github.com", "GitHub")
 
-        elif "google" in command:
+        elif "google" in raw:
             speak("Abrindo Google.")
             open_url_safely("https://www.google.com", "Google")
 

@@ -62,55 +62,88 @@ export default function JarvisDashboard() {
   }
 
 
-    // 1. WHATSAPP
-    if (command.includes("whatsapp") || command.includes("zap")) {
-      addLog("ACTION", "Abrindo WhatsApp Web...");
-      speakWebOnce("Abrindo WhatsApp.");
-      window.open("https://web.whatsapp.com", "_blank");
-    }
-    // 2. OBSIDIAN
-    else if (command.includes("obsidian")) {
-      addLog("ACTION", "Abrindo Obsidian...");
-      speakWebOnce("Abrindo Obsidian.");
-      window.open("obsidian://open", "_blank");
-    }
-    // 3. AC/DC / YOUTUBE MÚSICA
-    else if (command.includes("acdc") || command.includes("ac/dc") || command.includes("toca acdc")) {
+    // Normalize text and strip wake words at start
+    let raw = command.toLowerCase().trim();
+    raw = raw.replace(/^(chaves|jarvis|charles|davis|ei jarvis|ouvi jarvis)\s*/i, "");
+
+    // Phonetic normalization for AC/DC variants ("a cdc", "ac dc", "coloca cd", etc.)
+    const isAcdc = /\b(acdc|ac\/dc|a cdc|ac dc|a c d c|toca cd|coloca cd)\b/i.test(raw);
+
+    // Media search intent detection
+    const hasPlayAction = /\b(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abertura|musica|música|video|vídeo)\b/i.test(raw);
+    const isYouTubeSearch = hasPlayAction || (raw.includes("youtube") && raw.replace(/^(abra|abrir|open)?\s*o?\s*youtube\s*/i, "").trim().length > 0);
+
+    if (isAcdc) {
       addLog("ACTION", "Tocando AC/DC no YouTube...");
       speakWebOnce("Tocando AC/DC.");
       window.open("https://www.youtube.com/watch?v=pAgnJDJN4VA", "_blank");
     }
-    // 4. YOUTUBE
-    else if (command.includes("youtube")) {
+    else if (isYouTubeSearch) {
+      let query = raw;
+      const fillers = [
+        "abre o youtube e coloca", "coloca no youtube", "pesquisa no youtube", "procura no youtube",
+        "abre o youtube", "abrir youtube", "no youtube", "youtube", "toca para mim", "coloca para mim",
+        "tocar", "toca", "coloca", "coloque", "pesquisa", "procura", "música", "musica", "vídeo", "video",
+        "para mim", "por favor"
+      ];
+      for (const f of fillers) {
+        query = query.replaceAll(f, " ");
+      }
+      query = query.trim().replace(/\s+/g, " ");
+
+      if (query.length > 0) {
+        addLog("ACTION", `Buscando no YouTube: "${query}"...`);
+        speakWebOnce(`Tocando ${query} no YouTube.`);
+        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank");
+      } else {
+        addLog("ACTION", "Abrindo YouTube...");
+        speakWebOnce("Abrindo YouTube.");
+        window.open("https://www.youtube.com", "_blank");
+      }
+    }
+    // WHATSAPP
+    else if (raw.includes("whatsapp") || raw.includes("zap")) {
+      addLog("ACTION", "Abrindo WhatsApp Web...");
+      speakWebOnce("Abrindo WhatsApp.");
+      window.open("https://web.whatsapp.com", "_blank");
+    }
+    // OBSIDIAN
+    else if (raw.includes("obsidian")) {
+      addLog("ACTION", "Abrindo Obsidian...");
+      speakWebOnce("Abrindo Obsidian.");
+      window.open("obsidian://open", "_blank");
+    }
+    // YOUTUBE HOMEPAGE
+    else if (raw.includes("youtube")) {
       addLog("ACTION", "Abrindo YouTube...");
       speakWebOnce("Abrindo YouTube.");
       window.open("https://www.youtube.com", "_blank");
     }
-    // 5. CHATGPT
-    else if (command.includes("chatgpt") || command.includes("chat gpt")) {
+    // CHATGPT
+    else if (raw.includes("chatgpt") || raw.includes("chat gpt")) {
       addLog("ACTION", "Abrindo ChatGPT...");
       speakWebOnce("Abrindo ChatGPT.");
       window.open("https://chatgpt.com", "_blank");
     }
-    // 6. GITHUB
-    else if (command.includes("github")) {
+    // GITHUB
+    else if (raw.includes("github")) {
       addLog("ACTION", "Abrindo GitHub...");
       speakWebOnce("Abrindo GitHub.");
       window.open("https://github.com", "_blank");
     }
-    // 7. GOOGLE
-    else if (command.includes("google")) {
+    // GOOGLE
+    else if (raw.includes("google")) {
       addLog("ACTION", "Abrindo Google...");
       speakWebOnce("Abrindo Google.");
       window.open("https://www.google.com", "_blank");
     }
-    // 8. PALAVRA DE ATIVAÇÃO SIMPLES
-    else if (command.includes("jarvis") || command.includes("chaves")) {
+    // WAKE WORD ONLY
+    else if (raw.includes("jarvis") || raw.includes("chaves")) {
       addLog("JARVIS", "Jarvis pronto.");
     } else {
-      addLog("SYSTEM", `Executando busca por '${command}'...`);
-      speakWebOnce(`Buscando ${command}.`);
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(command)}`, "_blank");
+      addLog("SYSTEM", `Executando busca por '${raw}'...`);
+      speakWebOnce(`Buscando ${raw}.`);
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(raw)}`, "_blank");
     }
   };
 
