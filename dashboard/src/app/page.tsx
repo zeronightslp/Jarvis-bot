@@ -8,11 +8,36 @@ export default function JarvisDashboard() {
   const [lastHeard, setLastHeard] = useState("");
   const [textInput, setTextInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("Microfone em espera (Modo Contínuo)");
+  const [tunnelStatus, setTunnelStatus] = useState<"CONNECTED" | "DISCONNECTED" | "CHECKING">("CHECKING");
   const [logs, setLogs] = useState<Array<{ time: string; type: string; message: string }>>([
     { time: new Date().toLocaleTimeString(), type: "SYSTEM", message: "JARVIS Web Core v3.8 - Escuta por Voz e Digitação Ativas." },
   ]);
 
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const checkTunnelHealth = async () => {
+      const url = process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL;
+      if (!url) {
+        setTunnelStatus("DISCONNECTED");
+        return;
+      }
+      try {
+        const res = await fetch(`${url}/health`, { method: "GET", signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          setTunnelStatus("CONNECTED");
+        } else {
+          setTunnelStatus("DISCONNECTED");
+        }
+      } catch {
+        setTunnelStatus("DISCONNECTED");
+      }
+    };
+
+    checkTunnelHealth();
+    const tunnelInterval = setInterval(checkTunnelHealth, 10000);
+    return () => clearInterval(tunnelInterval);
+  }, []);
 
   useEffect(() => {
     const updateClock = () => {
@@ -250,6 +275,13 @@ export default function JarvisDashboard() {
         </div>
 
         <div className="flex items-center gap-6 text-sm text-cyan-300">
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${tunnelStatus === "CONNECTED" ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
+            <span className={tunnelStatus === "CONNECTED" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
+              NOTEBOOK: {tunnelStatus === "CONNECTED" ? "CONECTADO" : tunnelStatus === "CHECKING" ? "VERIFICANDO..." : "DESCONECTADO"}
+            </span>
+          </div>
+          <div className="border-l border-cyan-900 h-4" />
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${isListening ? "bg-emerald-400" : "bg-amber-500"}`} />
             <span>MIC: {isListening ? "MODO CONTÍNUO (ATIVO)" : "AGUARDANDO ATIVAÇÃO"}</span>

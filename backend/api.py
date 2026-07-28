@@ -17,11 +17,20 @@ app.add_middleware(
 class Command(BaseModel):
     command: str
 
+@app.get("/health")
+@app.get("/")
+async def health_check():
+    return {"status": "online", "system": "Jarvis Local Backend", "bridge": "active"}
+
 @app.post("/command")
 async def run_command(payload: Command):
     try:
         # Forward the command string to the existing Jarvis processor
-        process_voice_command(payload.command)
-        return {"status": "ok", "message": f"Comando '{payload.command}' executado"}
+        result = process_voice_command(payload.command)
+        return {
+            "status": "ok",
+            "message": f"Comando '{payload.command}' executado no notebook",
+            "payload": result
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
