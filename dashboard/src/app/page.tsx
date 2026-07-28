@@ -50,15 +50,24 @@ export default function JarvisDashboard() {
   const tunnelUrl = process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL;
   if (tunnelUrl) {
     try {
-      await fetch(`${tunnelUrl}/command`, {
+      const res = await fetch(`${tunnelUrl}/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command })
       });
-      addLog("REMOTE", "Comando enviado ao backend local");
+      if (res.ok) {
+        const data = await res.json();
+        addLog("REMOTE", `✅ Executado no notebook: ${data.message || "OK"}`);
+      } else {
+        addLog("ERROR", `❌ Erro do backend local (HTTP ${res.status})`);
+        speakWebOnce("Erro ao comunicar com o notebook.");
+      }
     } catch (e) {
-      addLog("ERROR", "Falha ao enviar comando ao backend");
+      addLog("ERROR", "❌ Backend local desconectado (Verifique se ./run_server.sh e o ngrok estão ativos no notebook)");
+      speakWebOnce("Servidor do notebook inacessível.");
     }
+  } else {
+    addLog("WARNING", "⚠️ Túnel remoto não configurado (NEXT_PUBLIC_JARVIS_TUNNEL_URL ausente no Vercel)");
   }
 
 

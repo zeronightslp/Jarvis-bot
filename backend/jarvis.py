@@ -54,19 +54,26 @@ def speak(text):
     except Exception as e:
         print(f"Erro ao executar fala: {e}")
 
-# --- HELPER DE ABERTURA SEGURA DE URLS ---
 def open_url_safely(url, description=""):
-    if url in opened_urls:
-        print(f"⚠️ {description or 'Página'} já está aberta.")
-        return False
+    global opened_urls
     opened_urls.add(url)
-    try:
-        if is_process_running("chrome"):
-            subprocess.Popen(["google-chrome", "--new-window", url])
-        else:
-            subprocess.Popen(["google-chrome", url])
-    except:
-        webbrowser.open(url)
+    browsers = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "firefox", "xdg-open"]
+    opened = False
+    for b in browsers:
+        try:
+            subprocess.Popen([b, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            opened = True
+            break
+        except Exception:
+            continue
+    if not opened:
+        try:
+            webbrowser.open(url)
+            opened = True
+        except Exception as e:
+            print(f"❌ Erro ao abrir URL {url}: {e}")
+            return False
+    print(f"✅ Página/Mídia aberta com sucesso ({description or url}): {url}")
     return True
 
 # --- HELPER PARA FECHAR PAGINAS ABERTAS ---
