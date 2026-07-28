@@ -9,15 +9,42 @@ export default function JarvisDashboard() {
   const [textInput, setTextInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("Microfone em espera (Modo Contínuo)");
   const [tunnelStatus, setTunnelStatus] = useState<"CONNECTED" | "DISCONNECTED" | "CHECKING">("CHECKING");
+  const [customTunnelUrl, setCustomTunnelUrl] = useState("");
+  const [showTunnelInput, setShowTunnelInput] = useState(false);
   const [logs, setLogs] = useState<Array<{ time: string; type: string; message: string }>>([
     { time: new Date().toLocaleTimeString(), type: "SYSTEM", message: "JARVIS Web Core v3.8 - Escuta por Voz e Digitação Ativas." },
   ]);
 
   const recognitionRef = useRef<any>(null);
 
+  // Load custom tunnel URL from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedUrl = localStorage.getItem("jarvis_custom_tunnel_url");
+      if (savedUrl) {
+        setCustomTunnelUrl(savedUrl);
+      } else if (process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL) {
+        setCustomTunnelUrl(process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL);
+      }
+    }
+  }, []);
+
+  const getActiveTunnelUrl = () => {
+    return customTunnelUrl.trim() || process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL || "";
+  };
+
+  const handleSaveTunnelUrl = (newUrl: string) => {
+    const trimmed = newUrl.trim().replace(/\/$/, "");
+    setCustomTunnelUrl(trimmed);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("jarvis_custom_tunnel_url", trimmed);
+    }
+    addLog("SYSTEM", `Túnel atualizado: ${trimmed || "Desativado"}`);
+  };
+
   useEffect(() => {
     const checkTunnelHealth = async () => {
-      const url = process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL;
+      const url = getActiveTunnelUrl();
       if (!url) {
         setTunnelStatus("DISCONNECTED");
         return;
@@ -35,9 +62,9 @@ export default function JarvisDashboard() {
     };
 
     checkTunnelHealth();
-    const tunnelInterval = setInterval(checkTunnelHealth, 10000);
+    const tunnelInterval = setInterval(checkTunnelHealth, 6000);
     return () => clearInterval(tunnelInterval);
-  }, []);
+  }, [customTunnelUrl]);
 
   useEffect(() => {
     const updateClock = () => {
@@ -65,35 +92,37 @@ export default function JarvisDashboard() {
   };
 
   const handleCommandExecution = async (text: string, source: "VOICE" | "TEXT" = "VOICE") => {
-  const command = text.toLowerCase().trim();
-  if (!command) return;
+    const command = text.toLowerCase().trim();
+    if (!command) return;
 
-  setLastHeard(command);
-  addLog(source === "VOICE" ? "VOICE_IN" : "TEXT_IN", `Comando (${source}): "${command}"`);
+    setLastHeard(command);
+    addLog(source === "VOICE" ? "VOICE_IN" : "TEXT_IN", `Comando (${source}): "${command}"`);
 
-  // Remote backend call via ngrok tunnel if configured
-  const tunnelUrl = process.env.NEXT_PUBLIC_JARVIS_TUNNEL_URL;
-  if (tunnelUrl) {
-    try {
-      const res = await fetch(`${tunnelUrl}/command`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        addLog("REMOTE", `✅ Executado no notebook: ${data.message || "OK"}`);
-      } else {
-        addLog("ERROR", `❌ Erro do backend local (HTTP ${res.status})`);
-        speakWebOnce("Erro ao comunicar com o notebook.");
+    // Remote backend call via ngrok tunnel if configured
+    const tunnelUrl = getActiveTunnelUrl();
+    if (tunnelUrl) {
+      try {
+        const res = await fetch(`${tunnelUrl}/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          addLog("REMOTE", `✅ Executado no notebook: ${data.message || "OK"}`);
+          speakWebOnce(`Comando enviado ao notebook.`);
+          return; // Command handled remotely by notebook backend!
+        } else {
+          addLog("ERROR", `❌ Erro do backend local (HTTP ${res.status})`);
+          speakWebOnce("Erro ao comunicar com o notebook.");
+        }
+      } catch (e) {
+        addLog("ERROR", "❌ Backend local desconectado (Verifique se ./run_server.sh e o ngrok estão ativos no notebook)");
+        speakWebOnce("Servidor do notebook inacessível.");
       }
-    } catch (e) {
-      addLog("ERROR", "❌ Backend local desconectado (Verifique se ./run_server.sh e o ngrok estão ativos no notebook)");
-      speakWebOnce("Servidor do notebook inacessível.");
+    } else {
+      addLog("WARNING", "⚠️ Túnel remoto não configurado. Cole o link do ngrok no topo do painel.");
     }
-  } else {
-    addLog("WARNING", "⚠️ Túnel remoto não configurado (NEXT_PUBLIC_JARVIS_TUNNEL_URL ausente no Vercel)");
-  }
 
 
     // Normalize text and strip wake words at start
@@ -280,6 +309,12 @@ export default function JarvisDashboard() {
             <span className={tunnelStatus === "CONNECTED" ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
               NOTEBOOK: {tunnelStatus === "CONNECTED" ? "CONECTADO" : tunnelStatus === "CHECKING" ? "VERIFICANDO..." : "DESCONECTADO"}
             </span>
+            <button
+              onClick={() => setShowTunnelInput(!showTunnelInput)}
+              className="text-xs text-cyan-400 hover:text-cyan-200 underline ml-1 font-mono"
+            >
+              {showTunnelInput ? "Fechar ⚙️" : "Configurar ⚙️"}
+            </button>
           </div>
           <div className="border-l border-cyan-900 h-4" />
           <div className="flex items-center gap-2">
@@ -290,6 +325,32 @@ export default function JarvisDashboard() {
           <div>HORA: <span className="text-cyan-100 font-bold">{currentTime || "00:00:00"}</span></div>
         </div>
       </header>
+
+      {/* Interactive Tunnel URL Bar */}
+      {(showTunnelInput || tunnelStatus === "DISCONNECTED") && (
+        <div className="bg-[#050d21] border-b border-cyan-900/60 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-20 shadow-md">
+          <div className="flex items-center gap-2 text-cyan-300 w-full sm:w-auto">
+            <span>🔗 <strong>Túnel ngrok:</strong></span>
+            <input
+              type="text"
+              placeholder="Ex: https://cdf9-2804-2dc-ff8d-dee0-8b3e-a1be-e99f-bc21.ngrok-free.app"
+              value={customTunnelUrl}
+              onChange={(e) => setCustomTunnelUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSaveTunnelUrl(customTunnelUrl); }}
+              className="bg-[#02050b] border border-cyan-800 rounded px-3 py-1.5 text-cyan-100 text-xs w-full sm:w-96 focus:outline-none focus:border-cyan-400 font-mono shadow-inner"
+            />
+            <button
+              onClick={() => handleSaveTunnelUrl(customTunnelUrl)}
+              className="bg-cyan-900 hover:bg-cyan-700 text-cyan-100 px-4 py-1.5 rounded font-bold transition-all border border-cyan-700"
+            >
+              Salvar Túnel
+            </button>
+          </div>
+          <div className="text-cyan-400/80 text-[11px] font-sans">
+            {tunnelStatus === "CONNECTED" ? "🟢 Notebook conectado com sucesso!" : "⚠️ Cole a URL HTTPS do ngrok rodando no seu notebook."}
+          </div>
+        </div>
+      )}
 
       {/* Main Area */}
       <main className="flex-1 p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl w-full mx-auto z-10">

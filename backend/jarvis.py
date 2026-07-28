@@ -77,14 +77,43 @@ def open_url_safely(url, description=""):
     print(f"✅ Página/Mídia aberta com sucesso ({description or url}): {url}")
     return True
 
+# --- SKILL: OBSIDIAN FAVORITES LOADER ---
+OBSIDIAN_FAVORITES_FILE = "/home/zeronight/Documentos/Minha mente/Músicas Favoritas.md"
+
+def load_obsidian_favorites():
+    """
+    Skill: Obsidian Favorites Loader
+    Lê o arquivo 'Músicas Favoritas.md' no cofre do Obsidian e mapeia palavras-chave para URLs.
+    """
+    favorites = {}
+    if not os.path.exists(OBSIDIAN_FAVORITES_FILE):
+        return favorites
+    try:
+        with open(OBSIDIAN_FAVORITES_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                # Matches format: - **Nome**: URL or - Nome: URL
+                match = re.search(r'[-*]\s+(.*?)\s*:\s*(https?://\S+)', line)
+                if match:
+                    raw_key = match.group(1).strip()
+                    url = match.group(2).strip()
+                    # Strip markdown bold asterisks
+                    key = re.sub(r'\*+', '', raw_key).lower().strip()
+                    favorites[key] = url
+                    clean_key = re.sub(r'\(.*?\)', '', key).strip()
+                    if clean_key:
+                        favorites[clean_key] = url
+    except Exception as e:
+        print(f"⚠️ Erro ao ler favoritos do Obsidian: {e}")
+    return favorites
+
 # --- SKILL: SMART MEDIA PLAYER ---
 def smart_media_player(query, platform="YouTube", media_type="música", mode="play"):
     """
     Skill: Smart Media Player
     Responsabilidades:
-    - Abrir plataformas de mídia (YouTube, Spotify, etc.)
-    - Pesquisar mídias ignorando anúncios e anúncios patrocinados (ytd-promoted, badge-style-ad)
-    - Selecionar e reproduzir o primeiro resultado orgânico
+    - Consultar primeiramente as Músicas Favoritas do Obsidian
+    - Caso não encontre, pesquisar no YouTube filtrando anúncios e elementos irrelevantes
     """
     print(f"🎬 [Skill: Smart Media Player] Plataforma: {platform} | Consulta: '{query}' | Tipo: {media_type} | Modo: {mode}")
 
@@ -92,6 +121,14 @@ def smart_media_player(query, platform="YouTube", media_type="música", mode="pl
         if not query or len(query.strip()) == 0:
             speak("Abrindo YouTube.")
             return open_url_safely("https://www.youtube.com", "YouTube Home")
+
+        # 1. Verifica favoritos do Obsidian primeiro!
+        obsidian_favs = load_obsidian_favorites()
+        query_clean = query.lower().strip()
+        for fav_name, fav_url in obsidian_favs.items():
+            if query_clean in fav_name or fav_name in query_clean:
+                speak(f"Reproduzindo {fav_name} dos favoritos do Obsidian.")
+                return open_url_safely(fav_url, f"Obsidian Favorito: {fav_name}")
 
         speak(f"Buscando {query} no YouTube e selecionando vídeo orgânico.")
         try:
@@ -269,6 +306,15 @@ def classify_intent(raw_text: str) -> dict:
             "confidence": 0.99
         }
 
+    if bool(re.search(r'\b(leave johnny|leave joni|liv johnny|música 2|musica 2)\b', cmd, flags=re.IGNORECASE)):
+        return {
+            "intent": "play_media",
+            "platform": "youtube",
+            "query": "LEAVE_JOHNNY",
+            "media_type": "music",
+            "confidence": 0.99
+        }
+
     if bool(re.search(r'^(abra|abrir|open|abrindo)?\s*o?\s*youtube$', cmd, flags=re.IGNORECASE)) or cmd == "no youtube":
         return {
             "intent": "open_app",
@@ -342,9 +388,13 @@ def process_voice_command(command):
 
         if intent == "play_media":
             if query == "AC/DC":
-                acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
+                acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA&list=RDpAgnJDJN4VA&start_radio=1"
                 speak("Tocando AC/DC.")
-                open_url_safely(acdc_url, "AC/DC YouTube")
+                open_url_safely(acdc_url, "AC/DC YouTube Mix")
+            elif query == "LEAVE_JOHNNY":
+                johnny_url = "https://www.youtube.com/watch?v=1JfJshL8etQ&list=RD1JfJshL8etQ&start_radio=1"
+                speak("Tocando Leave Johnny Leave.")
+                open_url_safely(johnny_url, "Leave Johnny Leave YouTube Mix")
             else:
                 smart_media_player(query=query, platform=platform, media_type=parsed.get("media_type", "video"), mode="play")
 
