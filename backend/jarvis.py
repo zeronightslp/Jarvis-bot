@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 import re
 import psutil
+import json
 from lmnt import AsyncLmnt
 from dotenv import load_dotenv
 
@@ -249,8 +250,6 @@ def listen_for_claps():
         except Exception:
             time.sleep(0.05)
 
-# --- PROCESSAMENTO DE COMANDOS DE VOZ ---
-def process_voice_command(command):
 # --- SKILL 1: INTENT CLASSIFIER ---
 def classify_intent(raw_text: str) -> dict:
     """
