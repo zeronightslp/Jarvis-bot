@@ -232,87 +232,138 @@ def listen_for_claps():
 
 # --- PROCESSAMENTO DE COMANDOS DE VOZ ---
 def process_voice_command(command):
+# --- SKILL 1: INTENT CLASSIFIER ---
+def classify_intent(raw_text: str) -> dict:
+    """
+    Skill: Intent Classifier
+    Responsabilidade: Transformar fala natural do usuário em um payload estruturado.
+    Não executa nada no sistema ou navegador.
+    """
+    cmd = raw_text.lower().strip()
+    cmd = re.sub(r'^(chaves|jarvis|charles|davis|ei jarvis|ouvi jarvis)\s*', '', cmd, flags=re.IGNORECASE).strip()
+
+    if bool(re.search(r'\b(acdc|ac\/dc|a cdc|ac dc|a c d c|toca cd|coloca cd)\b', cmd, flags=re.IGNORECASE)):
+        return {
+            "intent": "play_media",
+            "platform": "youtube",
+            "query": "AC/DC",
+            "media_type": "music",
+            "confidence": 0.99
+        }
+
+    if bool(re.search(r'^(abra|abrir|open|abrindo)?\s*o?\s*youtube$', cmd, flags=re.IGNORECASE)) or cmd == "no youtube":
+        return {
+            "intent": "open_app",
+            "platform": "youtube",
+            "query": "",
+            "media_type": "homepage",
+            "confidence": 0.95
+        }
+
+    play_verbs = r'^(coloca|toca|reproduz|reprodut|inicia|quero\s+ouvir|quero\s+assistir|pesquisa|procura|abrir|abra|abrindo)\s+'
+    has_play_keyword = any(w in cmd for w in ["coloca", "toca", "reproduz", "ouvir", "assistir", "abertura", "música", "musica", "vídeo", "video"])
+
+    if bool(re.search(play_verbs, cmd, flags=re.IGNORECASE)) or has_play_keyword or "youtube" in cmd:
+        query = re.sub(play_verbs, '', cmd, flags=re.IGNORECASE)
+        query = re.sub(r'^(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*', '', query, flags=re.IGNORECASE)
+        query = re.sub(r'\b(para mim|pra mim|por favor|no youtube|pelo youtube|youtube)\b', '', query, flags=re.IGNORECASE).strip()
+
+        return {
+            "intent": "play_media",
+            "platform": "youtube",
+            "query": query,
+            "media_type": "video",
+            "confidence": 0.95
+        }
+
+    if "whatsapp" in cmd or "zap" in cmd:
+        return {"intent": "open_app", "platform": "whatsapp", "query": "", "media_type": "app", "confidence": 0.95}
+
+    if "obsidian" in cmd:
+        return {"intent": "open_app", "platform": "obsidian", "query": "", "media_type": "app", "confidence": 0.95}
+
+    if "calendário" in cmd or "agenda" in cmd:
+        return {"intent": "open_app", "platform": "calendar", "query": "", "media_type": "app", "confidence": 0.95}
+
+    if "fechar tudo" in cmd:
+        return {"intent": "system_action", "platform": "system", "query": "close_all", "media_type": "action", "confidence": 0.99}
+
+    if "qual página" in cmd or "página atual" in cmd:
+        return {"intent": "system_action", "platform": "system", "query": "get_urls", "media_type": "action", "confidence": 0.99}
+
+    if "chatgpt" in cmd or "chat gpt" in cmd:
+        return {"intent": "open_app", "platform": "chatgpt", "query": "", "media_type": "app", "confidence": 0.95}
+
+    if "github" in cmd:
+        return {"intent": "open_app", "platform": "github", "query": "", "media_type": "app", "confidence": 0.95}
+
+    if "google" in cmd:
+        return {"intent": "open_app", "platform": "google", "query": "", "media_type": "app", "confidence": 0.95}
+
+    return {
+        "intent": "web_search",
+        "platform": "google",
+        "query": cmd,
+        "media_type": "search",
+        "confidence": 0.80
+    }
+
+# --- PROCESSADOR DE COMANDOS BASEADO EM INTENT CLASSIFIER ---
+def process_voice_command(command):
     global is_voice_processing
     is_voice_processing = True
 
     try:
-        command = command.lower().strip()
-        print(f"⚙️ Comando detectado: '{command}'")
+        print(f"⚙️ Transcrição recebida: '{command}'")
+        parsed = classify_intent(command)
+        print(f"🧠 [Intent Classifier Output] {parsed}")
 
-        # Clean wake words at the beginning
-        raw = re.sub(r'^(chaves|jarvis|charles|davis|ei jarvis|ouvi jarvis)\s*', '', command, flags=re.IGNORECASE).strip()
+        intent = parsed.get("intent")
+        platform = parsed.get("platform")
+        query = parsed.get("query", "")
 
-        # Phonetic normalization for AC/DC variants ("a cdc", "ac dc", "coloca cd", etc.)
-        is_acdc = bool(re.search(r'\b(acdc|ac\/dc|a cdc|ac dc|a c d c|toca cd|coloca cd)\b', raw, flags=re.IGNORECASE))
-
-        # Direct YouTube Homepage Open intent
-        is_yt_open_only = bool(re.search(r'^(abra|abrir|open|abrindo)?\s*o?\s*youtube$', raw, flags=re.IGNORECASE)) or raw == "no youtube"
-
-        # Check for media/play intent
-        has_play_action = any(w in raw for w in ["toca", "tocar", "play", "coloca", "coloque", "ouvir", "pesquisa", "procura", "abertura", "música", "musica", "vídeo", "video"])
-        is_yt_intent = not is_yt_open_only and (has_play_action or ("youtube" in raw and len(re.sub(r'^(abra|abrir|open|abrindo)?\s*o?\s*youtube\s*', '', raw, flags=re.IGNORECASE).strip()) > 0))
-
-        if is_acdc:
-            acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
-            if acdc_url in opened_urls:
-                print("AC/DC já aberto.")
-            else:
+        if intent == "play_media":
+            if query == "AC/DC":
+                acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
                 speak("Tocando AC/DC.")
                 open_url_safely(acdc_url, "AC/DC YouTube")
+            else:
+                smart_media_player(query=query, platform=platform, media_type=parsed.get("media_type", "video"), mode="play")
 
-        elif is_yt_intent:
-            query = re.sub(
-                r'^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra|abrindo|buscando)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*',
-                '',
-                raw,
-                flags=re.IGNORECASE
-            )
-            smart_media_player(query=query, platform="YouTube", media_type="música", mode="play")
+        elif intent == "open_app":
+            if platform == "youtube":
+                speak("Abrindo YouTube.")
+                open_url_safely("https://www.youtube.com", "YouTube")
+            elif platform == "whatsapp":
+                speak("Abrindo WhatsApp.")
+                open_url_safely("https://web.whatsapp.com", "WhatsApp Web")
+            elif platform == "obsidian":
+                open_obsidian()
+            elif platform == "calendar":
+                speak("Abrindo agenda.")
+                open_url_safely("https://calendar.google.com", "Google Calendar")
+            elif platform == "chatgpt":
+                speak("Abrindo ChatGPT.")
+                open_url_safely("https://chatgpt.com", "ChatGPT")
+            elif platform == "github":
+                speak("Abrindo GitHub.")
+                open_url_safely("https://github.com", "GitHub")
+            elif platform == "google":
+                speak("Abrindo Google.")
+                open_url_safely("https://www.google.com", "Google")
 
-        # 1. OBSIDIAN
-        elif "obsidian" in raw:
-            open_obsidian()
+        elif intent == "system_action":
+            if query == "close_all":
+                speak(close_all_pages())
+            elif query == "get_urls":
+                speak(get_opened_urls())
 
-        # 2. WHATSAPP
-        elif "whatsapp" in raw or "zap" in raw:
-            speak("Abrindo WhatsApp.")
-            open_url_safely("https://web.whatsapp.com", "WhatsApp Web")
+        elif intent == "web_search":
+            if len(query) > 1:
+                speak(f"Buscando {query} no Google.")
+                open_url_safely(f"https://www.google.com/search?q={urllib.parse.quote(query)}", f"Busca Google {query}")
 
-        # 2.5 CALENDAR
-        elif "calendário" in raw or "agenda" in raw:
-            speak("Abrindo agenda.")
-            open_url_safely("https://calendar.google.com", "Google Calendar")
-
-        # 2.6 STATUS DAS PAGINAS
-        elif "fechar tudo" in raw:
-            speak(close_all_pages())
-
-        elif "qual página" in raw or "página atual" in raw:
-            speak(get_opened_urls())
-
-        # 4. OUTROS SITES
-        elif "youtube" in raw:
-            speak("Abrindo YouTube.")
-            open_url_safely("https://www.youtube.com", "YouTube")
-
-        elif "chatgpt" in raw or "chat gpt" in raw:
-            speak("Abrindo ChatGPT.")
-            open_url_safely("https://chatgpt.com", "ChatGPT")
-
-        elif "github" in raw:
-            speak("Abrindo GitHub.")
-            open_url_safely("https://github.com", "GitHub")
-
-        elif "google" in raw:
-            speak("Abrindo Google.")
-            open_url_safely("https://www.google.com", "Google")
-
-        # 5. CONTROLE DE MÍDIA EXPLÍCITO
-        elif any(w in command for w in ["pausar música", "para a música", "pausar o vídeo", "parar música"]):
-            subprocess.run(["playerctl", "pause"], check=False)
-
-        elif any(w in command for w in ["próxima música", "pular música", "avança a música"]):
-            subprocess.run(["playerctl", "next"], check=False)
+        return parsed
 
     finally:
         time.sleep(0.5)
