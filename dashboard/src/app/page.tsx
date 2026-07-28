@@ -78,9 +78,12 @@ export default function JarvisDashboard() {
     // Phonetic normalization for AC/DC variants ("a cdc", "ac dc", "coloca cd", etc.)
     const isAcdc = /\b(acdc|ac\/dc|a cdc|ac dc|a c d c|toca cd|coloca cd)\b/i.test(raw);
 
+    // Direct YouTube Homepage Open intent
+    const isYouTubeOpenOnly = /^(abra|abrir|open|abrindo)?\s*o?\s*youtube$/i.test(raw) || raw === "no youtube";
+
     // Media search intent detection
     const hasPlayAction = /\b(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abertura|musica|música|video|vídeo)\b/i.test(raw);
-    const isYouTubeSearch = hasPlayAction || (raw.includes("youtube") && raw.replace(/^(abra|abrir|open)?\s*o?\s*youtube\s*/i, "").trim().length > 0);
+    const isYouTubeSearch = !isYouTubeOpenOnly && (hasPlayAction || (raw.includes("youtube") && raw.replace(/^(abra|abrir|open|abrindo)?\s*o?\s*youtube\s*/i, "").trim().length > 0));
 
     if (isAcdc) {
       addLog("ACTION", "Tocando AC/DC no YouTube...");
@@ -89,7 +92,7 @@ export default function JarvisDashboard() {
     }
     else if (isYouTubeSearch) {
       let query = raw
-        .replace(/^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*/i, "")
+        .replace(/^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra|abrindo|buscando)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*/i, "")
         .replace(/\b(no youtube|pelo youtube|youtube|para mim|por favor)\b/gi, "")
         .trim();
 

@@ -76,6 +76,56 @@ def open_url_safely(url, description=""):
     print(f"✅ Página/Mídia aberta com sucesso ({description or url}): {url}")
     return True
 
+# --- SKILL: SMART MEDIA PLAYER ---
+def smart_media_player(query, platform="YouTube", media_type="música", mode="play"):
+    """
+    Skill: Smart Media Player
+    Responsabilidades:
+    - Abrir plataformas de mídia (YouTube, Spotify, etc.)
+    - Pesquisar mídias ignorando anúncios e anúncios patrocinados (ytd-promoted, badge-style-ad)
+    - Selecionar e reproduzir o primeiro resultado orgânico
+    """
+    print(f"🎬 [Skill: Smart Media Player] Plataforma: {platform} | Consulta: '{query}' | Tipo: {media_type} | Modo: {mode}")
+
+    if platform.lower() == "youtube":
+        if not query or len(query.strip()) == 0:
+            speak("Abrindo YouTube.")
+            return open_url_safely("https://www.youtube.com", "YouTube Home")
+
+        speak(f"Buscando {query} no YouTube e filtrando anúncios.")
+        try:
+            url_search = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+            req = urllib.request.Request(
+                url_search,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            )
+            html = urllib.request.urlopen(req).read().decode('utf-8', errors='ignore')
+
+            # Filter out promoted ad blocks and ad badges from HTML before extracting video ID
+            clean_html = re.sub(r'<ytd-promoted-[^>]+>.*?</ytd-promoted-[^>]+>', '', html, flags=re.DOTALL)
+            clean_html = re.sub(r'("badgeStyleType"\s*:\s*"BADGE_STYLE_TYPE_AD")[^}]+', '', clean_html)
+
+            video_ids = re.findall(r"watch\?v=([a-zA-Z0-9_-]{11})", clean_html)
+
+            # Preserve order while eliminating duplicate IDs
+            seen = set()
+            organic_video_ids = [v for v in video_ids if not (v in seen or seen.add(v))]
+
+            if organic_video_ids:
+                first_organic = f"https://www.youtube.com/watch?v={organic_video_ids[0]}"
+                speak(f"Reproduzindo primeiro resultado orgânico para {query}.")
+                return open_url_safely(first_organic, f"Vídeo Orgânico: {query}")
+            else:
+                return open_url_safely(url_search, f"Busca Orgânica YouTube: {query}")
+
+        except Exception as e:
+            print(f"⚠️ Erro no Smart Media Player: {e}")
+            return open_url_safely(f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}", f"Busca YouTube: {query}")
+
+    elif platform.lower() == "spotify":
+        speak(f"Buscando {query} no Spotify.")
+        return open_url_safely(f"https://open.spotify.com/search/{urllib.parse.quote(query)}", f"Spotify Search: {query}")
+
 # --- HELPER PARA FECHAR PAGINAS ABERTAS ---
 def close_all_pages():
     global opened_urls
@@ -195,9 +245,12 @@ def process_voice_command(command):
         # Phonetic normalization for AC/DC variants ("a cdc", "ac dc", "coloca cd", etc.)
         is_acdc = bool(re.search(r'\b(acdc|ac\/dc|a cdc|ac dc|a c d c|toca cd|coloca cd)\b', raw, flags=re.IGNORECASE))
 
+        # Direct YouTube Homepage Open intent
+        is_yt_open_only = bool(re.search(r'^(abra|abrir|open|abrindo)?\s*o?\s*youtube$', raw, flags=re.IGNORECASE)) or raw == "no youtube"
+
         # Check for media/play intent
         has_play_action = any(w in raw for w in ["toca", "tocar", "play", "coloca", "coloque", "ouvir", "pesquisa", "procura", "abertura", "música", "musica", "vídeo", "video"])
-        is_yt_intent = has_play_action or ("youtube" in raw and len(re.sub(r'^(abra|abrir|open)?\s*o?\s*youtube\s*', '', raw, flags=re.IGNORECASE).strip()) > 0)
+        is_yt_intent = not is_yt_open_only and (has_play_action or ("youtube" in raw and len(re.sub(r'^(abra|abrir|open|abrindo)?\s*o?\s*youtube\s*', '', raw, flags=re.IGNORECASE).strip()) > 0))
 
         if is_acdc:
             acdc_url = "https://www.youtube.com/watch?v=pAgnJDJN4VA"
@@ -209,30 +262,12 @@ def process_voice_command(command):
 
         elif is_yt_intent:
             query = re.sub(
-                r'^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*',
+                r'^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra|abrindo|buscando)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*',
                 '',
                 raw,
                 flags=re.IGNORECASE
             )
-            query = re.sub(r'\b(no youtube|pelo youtube|youtube|para mim|por favor)\b', '', query, flags=re.IGNORECASE).strip()
-
-            if len(query) > 0:
-                speak(f"Buscando {query} no YouTube.")
-                try:
-                    url_search = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
-                    req = urllib.request.Request(url_search, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64)"})
-                    html = urllib.request.urlopen(req).read().decode()
-                    video_ids = re.findall(r"watch\?v=([a-zA-Z0-9_-]{11})", html)
-                    if video_ids:
-                        first_video = f"https://www.youtube.com/watch?v={video_ids[0]}"
-                        open_url_safely(first_video, f"Vídeo {query}")
-                    else:
-                        open_url_safely(url_search, f"Busca {query}")
-                except Exception:
-                    open_url_safely(f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}", "Busca YouTube")
-            else:
-                speak("Abrindo YouTube.")
-                open_url_safely("https://www.youtube.com", "YouTube")
+            smart_media_player(query=query, platform="YouTube", media_type="música", mode="play")
 
         # 1. OBSIDIAN
         elif "obsidian" in raw:
