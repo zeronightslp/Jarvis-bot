@@ -79,21 +79,14 @@ export default function JarvisDashboard() {
       window.open("https://www.youtube.com/watch?v=pAgnJDJN4VA", "_blank");
     }
     else if (isYouTubeSearch) {
-      let query = raw;
-      const fillers = [
-        "abre o youtube e coloca", "coloca no youtube", "pesquisa no youtube", "procura no youtube",
-        "abre o youtube", "abrir youtube", "no youtube", "youtube", "toca para mim", "coloca para mim",
-        "tocar", "toca", "coloca", "coloque", "pesquisa", "procura", "música", "musica", "vídeo", "video",
-        "para mim", "por favor"
-      ];
-      for (const f of fillers) {
-        query = query.replaceAll(f, " ");
-      }
-      query = query.trim().replace(/\s+/g, " ");
+      let query = raw
+        .replace(/^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*/i, "")
+        .replace(/\b(no youtube|pelo youtube|youtube|para mim|por favor)\b/gi, "")
+        .trim();
 
       if (query.length > 0) {
         addLog("ACTION", `Buscando no YouTube: "${query}"...`);
-        speakWebOnce(`Tocando ${query} no YouTube.`);
+        speakWebOnce(`Buscando ${query} no YouTube.`);
         window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank");
       } else {
         addLog("ACTION", "Abrindo YouTube...");

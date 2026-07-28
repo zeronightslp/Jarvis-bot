@@ -201,16 +201,13 @@ def process_voice_command(command):
                 open_url_safely(acdc_url, "AC/DC YouTube")
 
         elif is_yt_intent:
-            query = raw
-            fillers = [
-                "abre o youtube e coloca", "coloca no youtube", "pesquisa no youtube", "procura no youtube",
-                "abre o youtube", "abrir youtube", "no youtube", "youtube", "toca para mim", "coloca para mim",
-                "tocar", "toca", "coloca", "coloque", "pesquisa", "procura", "música", "musica", "vídeo", "video",
-                "para mim", "por favor"
-            ]
-            for f in fillers:
-                query = query.replace(f, " ")
-            query = re.sub(r'\s+', ' ', query).strip()
+            query = re.sub(
+                r'^(toca|tocar|play|coloca|coloque|ouvir|pesquisa|procura|abrir|abra)\s+(a\s+|o\s+)?(música\s+de|música|vídeo\s+de|vídeo|abertura\s+de|abertura)?\s*',
+                '',
+                raw,
+                flags=re.IGNORECASE
+            )
+            query = re.sub(r'\b(no youtube|pelo youtube|youtube|para mim|por favor)\b', '', query, flags=re.IGNORECASE).strip()
 
             if len(query) > 0:
                 speak(f"Buscando {query} no YouTube.")
